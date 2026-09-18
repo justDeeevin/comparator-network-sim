@@ -3,6 +3,7 @@
 
   let {
     value = $bindable(),
+    class: className,
     min,
     max,
     ...props
@@ -10,7 +11,8 @@
 </script>
 
 <input
-  class="field-sizing-content min-w-3 border border-black px-1 text-center"
+  class={'field-sizing-content min-w-3 border border-black px-1 text-center ' +
+    className}
   bind:value
   oninput={() => {
     value = parseInt(value.toString().replace(/[^0-9]/g, '')) || 0;

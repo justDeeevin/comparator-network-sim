@@ -5,15 +5,8 @@
 </script>
 
 <button
-  class={`
-    cursor-pointer
-    rounded-sm
-    border
-border-black
-    bg-gray-200
-    px-1
-    ${className}
-  `}
+  class={'cursor-pointer rounded-sm border border-black bg-gray-200 px-1 ' +
+    className}
   {...props}
 >
   {@render children?.()}

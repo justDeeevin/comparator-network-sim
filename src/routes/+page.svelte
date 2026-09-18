@@ -2,6 +2,7 @@
   import NumAdjust from '$lib/components/num-adjust.svelte';
   import Button from '$lib/components/button.svelte';
   import NumInput from '$lib/components/num-input.svelte';
+  import Link from '$lib/components/link.svelte';
   import { SvelteMap as Map } from 'svelte/reactivity';
 
   const initial_depth = 3;
@@ -19,24 +20,25 @@
     depth->row->connected row
   */
   let connections: Map<number, Map<number, number>> = $state(new Map());
-  let crossings: Map<number, Set<number>> = $derived(
-    new Map(
-      connections
-        .entries()
-        .map(([k, connections]) => [
-          k,
-          new Set(
-            connections
-              .entries()
-              .flatMap(([k, v]) =>
-                Array.from({ length: v - k - 1 }, (_, i) => k + i + 1),
-              ),
-          ),
-        ]),
-    ),
-  );
+  /**
+    depth->row->how many crossings
+  */
+  const crossings = $derived.by(() => {
+    const out: Map<number, Map<number, number>> = new Map();
 
-  let outputs = $derived.by(() => {
+    for (const [depth, nodes] of connections)
+      for (const [k, v] of nodes) {
+        const map = out.getOrInsertComputed(depth, () => new Map());
+        for (let i = 0; i < v - k - 1; i++)
+          map.set(k + i + 1, map.getOrInsert(k + i + 1, 0) + 1);
+      }
+
+    console.debug(out);
+
+    return out;
+  });
+
+  const outputs = $derived.by(() => {
     if (connections.size === 0) return inputs;
 
     let output = Array.from(inputs);
@@ -66,7 +68,7 @@
     if (source !== target) nodes.set(source, target);
   }
 
-  function shuffled<T>(array: T[]): T[] {
+  function shuffled<T>(array: T[]) {
     for (let i = array.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [array[i], array[j]] = [array[j], array[i]];
@@ -76,10 +78,15 @@
   }
 </script>
 
-<div class="grid h-screen w-screen grid-rows-3">
+<div class="grid h-screen w-screen grid-rows-5">
+  <div class="row-start-1 row-end-3 flex items-center justify-center">
+    <h3 class="text-lg">
+      click two nodes at the same depth to make a connection
+    </h3>
+  </div>
   <div
     class="
-      row-2
+      row-3
       flex
       flex-col
       items-center
@@ -100,9 +107,8 @@
                 cursor-pointer
                 justify-center
                 rounded-full
-                border
-                border-black
-                ${source?.[0] === depth && source?.[1] === row ? 'bg-red-500' : 'bg-gray-200'}
+                bg-gray-200
+                ${source?.[0] === depth && source?.[1] === row ? 'border-2 border-blue-500' : 'border border-black'}
               `}
               onclick={() => {
                 if (source === undefined) source = [depth, row];
@@ -131,10 +137,19 @@
       </div>
     {/each}
   </div>
-  <div class="-row-1 flex justify-center gap-3">
+  <div class="-row-2 flex items-end justify-center gap-3">
     <NumAdjust label="Depth" bind:value={depth} min={1} />
     <NumAdjust label="Inputs" bind:value={inputs.length} min={2} />
     <Button onclick={() => (inputs = shuffled(inputs))}>Shuffle inputs</Button>
     <Button onclick={() => (connections = new Map())}>Clear connections</Button>
   </div>
+  <p class="-row-1 my-1.5 text-center">
+    made by <Link href="https://justdeeevin.dev">devin droddy</Link>
+    (<Link
+      href="https://github.com/justdeeevin/comparator-network-sim"
+      target="_none"
+    >
+      source
+    </Link>)
+  </p>
 </div>
