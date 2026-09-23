@@ -9,7 +9,9 @@
   const initial_inputs = 4;
 
   let depth = $state(initial_depth);
-  let inputs = $state(Array.from({ length: initial_inputs }, (_, i) => i + 1));
+  const inputs = $state(
+    Array.from({ length: initial_inputs }, (_, i) => i + 1),
+  );
   $effect(() => {
     for (let i = 0; i < inputs.length; i++)
       if (inputs[i] === undefined) inputs[i] = i + 1;
@@ -19,32 +21,32 @@
   /**
     depth->row->connected row
   */
-  let connections: Map<number, Map<number, number>> = $state(new Map());
-  let crossings: Map<number, Set<number>> = $derived(
-    new Map(
-      connections
-        .entries()
-        .map(([k, connections]) => [
-          k,
-          new Set(
-            connections
-              .entries()
-              .flatMap(([k, v]) =>
-                Array.from({ length: v - k - 1 }, (_, i) => k + i + 1),
-              ),
-          ),
-        ]),
-    ),
-  );
+  const connections: Map<number, Map<number, number>> = $state(new Map());
+  const crossings = $derived.by(() => {
+    const crossings: Map<number, Map<number, number>> = new Map();
+
+    for (const [depth, nodes] of connections) {
+      const dcrossings = crossings.getOrInsertComputed(depth, () => new Map());
+
+      for (const [source, target] of nodes)
+        for (let i = source + 1; i < target; i++)
+          dcrossings.set(
+            i,
+            dcrossings.getOrInsert(i, nodes.get(i) === undefined ? 0 : 1) + 1,
+          );
+    }
+
+    return crossings;
+  });
   const outputs = $derived.by(() => {
     if (connections.size === 0) return inputs;
 
-    let output = Array.from(inputs);
+    const output = Array.from(inputs);
     for (let d = 0; d < depth; d++) {
-      let nodes = connections.get(d);
+      const nodes = connections.get(d);
       if (nodes === undefined) continue;
       for (let i = 0; i < output.length; i++) {
-        let connection = nodes.get(i);
+        const connection = nodes.get(i);
         if (connection !== undefined && output[connection] < output[i])
           [output[i], output[connection]] = [output[connection], output[i]];
       }
@@ -54,11 +56,11 @@
 
   function connect(depth: number, source: number, target: number) {
     if (source > target) [source, target] = [target, source];
-    let nodes = connections.getOrInsertComputed(depth, () => new Map());
+    const nodes = connections.getOrInsertComputed(depth, () => new Map());
 
     // If either node is already targeted, break its connection
     for (const n of [source, target]) {
-      let deleteme_source = nodes.entries().find(([_, d]) => d === n)?.[0];
+      const deleteme_source = nodes.entries().find(([_, d]) => d === n)?.[0];
       if (deleteme_source !== undefined) nodes.delete(deleteme_source);
     }
 
@@ -66,21 +68,41 @@
     if (source !== target) nodes.set(source, target);
   }
 
-  function shuffled<T>(array: T[]) {
+  function connection_style(depth: number, row: number) {
+    const colors = [
+      'bg-black',
+      'bg-black',
+      'bg-red-700',
+      'bg-yellow-600',
+      'bg-teal-700',
+      'bg-orange-600',
+    ];
+
+    const n_crossings = crossings.get(depth)?.get(row) ?? 0;
+    if (n_crossings >= colors.length)
+      console.warn(
+        `node (${depth}, ${row}) has more crossings than there are available colors; wrapping around`,
+      );
+    const color = colors[n_crossings % colors.length];
+    const z_index = n_crossings == 0 ? '-z-1' : `z-${n_crossings}`;
+
+    return `${color} ${z_index}`;
+  }
+
+  function shuffle<T>(array: T[]) {
     for (let i = array.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [array[i], array[j]] = [array[j], array[i]];
     }
-
-    return array;
   }
 </script>
 
 <div class="grid h-screen w-screen grid-rows-5">
   <div class="row-start-1 row-end-3 flex items-center justify-center">
-    <h3 class="text-lg">
-      click two nodes at the same depth to make a connection
-    </h3>
+    <div class="text-center text-lg">
+      <h3>click two nodes at the same depth to make a connection</h3>
+      <h3>stacked connections are color-coded</h3>
+    </div>
   </div>
   <div
     class="
@@ -124,8 +146,7 @@
                     h-14
                     w-1
                     cursor-default
-                    bg-black
-                    ${crossings.get(depth)?.has(row) ? '' : ' -z-1'}
+                    ${connection_style(depth, row)}
                   `}
                 ></div>
               {/if}
@@ -139,8 +160,8 @@
   <div class="-row-2 flex items-end justify-center gap-3">
     <NumAdjust label="Depth" bind:value={depth} min={1} />
     <NumAdjust label="Inputs" bind:value={inputs.length} min={2} />
-    <Button onclick={() => (inputs = shuffled(inputs))}>Shuffle inputs</Button>
-    <Button onclick={() => (connections = new Map())}>Clear connections</Button>
+    <Button onclick={() => shuffle(inputs)}>Shuffle inputs</Button>
+    <Button onclick={() => connections.clear()}>Clear connections</Button>
   </div>
   <p class="-row-1 my-1.5 text-center">
     made by <Link href="https://justdeeevin.dev">devin droddy</Link>
