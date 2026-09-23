@@ -20,24 +20,22 @@
     depth->row->connected row
   */
   let connections: Map<number, Map<number, number>> = $state(new Map());
-  /**
-    depth->row->how many crossings
-  */
-  const crossings = $derived.by(() => {
-    const out: Map<number, Map<number, number>> = new Map();
-
-    for (const [depth, nodes] of connections)
-      for (const [k, v] of nodes) {
-        const map = out.getOrInsertComputed(depth, () => new Map());
-        for (let i = 0; i < v - k - 1; i++)
-          map.set(k + i + 1, map.getOrInsert(k + i + 1, 0) + 1);
-      }
-
-    console.debug(out);
-
-    return out;
-  });
-
+  let crossings: Map<number, Set<number>> = $derived(
+    new Map(
+      connections
+        .entries()
+        .map(([k, connections]) => [
+          k,
+          new Set(
+            connections
+              .entries()
+              .flatMap(([k, v]) =>
+                Array.from({ length: v - k - 1 }, (_, i) => k + i + 1),
+              ),
+          ),
+        ]),
+    ),
+  );
   const outputs = $derived.by(() => {
     if (connections.size === 0) return inputs;
 
@@ -125,6 +123,7 @@
                   class={`
                     h-14
                     w-1
+                    cursor-default
                     bg-black
                     ${crossings.get(depth)?.has(row) ? '' : ' -z-1'}
                   `}
